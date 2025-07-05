@@ -1,1 +1,0 @@
-# minseid.github.io
