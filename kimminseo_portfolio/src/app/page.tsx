@@ -96,8 +96,7 @@ export default function Home() {
   const introQAs = [
     {
       type: 'profile',
-      img: '/profile.jpg', // 실제 이미지 경로로 교체 필요
-      intro: '안녕하세요! 성장하는 백엔드 개발자 김민서입니다.'
+      intro: '안녕하세요! 끊임없이 학습하는 개발자 김민서입니다.'
     },
     {
       q: '비전공자이지만 개발자로 입문하게된 이유',
@@ -215,7 +214,7 @@ export default function Home() {
             {/* Q/A 카드 */}
             {introQAs[currentQAIndex].type === 'profile' ? (
               <div className="w-full bg-white/90 rounded-2xl shadow-lg p-8 max-w-2xl text-black flex flex-col items-center justify-center gap-4" style={{ fontFamily: 'MaplestoryOTFBold', minHeight: 220 }}>
-                <img src={introQAs[currentQAIndex].img} alt="프로필" className="w-32 h-32 rounded-full object-cover mb-4 shadow" />
+                <img src={'/KakaoTalk_20250624_192928124.jpg'} alt="프로필" className="w-32 h-32 rounded-full object-cover mb-4 shadow" />
                 <div className="text-2xl font-bold text-center">김민서</div>
                 <div className="text-lg text-center">{introQAs[currentQAIndex].intro}</div>
               </div>
