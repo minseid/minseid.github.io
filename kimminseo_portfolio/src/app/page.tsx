@@ -18,7 +18,7 @@ A. 처음 프로그래밍을 접하여 입문하게 되면서 꼭 내게 기획�
 
 const tooltipArr = [tooltipText1, tooltipText2, tooltipText3, tooltipText4];
 
-// 기술 스택 정보 (예시: python만 설명)
+// 기술 스택 정보
 const techStacks = [
   {
     src: '/image 3.svg',
@@ -82,18 +82,14 @@ const techStacks = [
   },
 ];
 
-
-// tech stack 아이콘별 ref 배열
 const stackRefs = techStacks.map(() => createRef());
 
-// Project Data - Add your project details here
+// Project Data
 const projects = [
   { id: 1, imageSrc: '/Mask group11.svg', title: '프로젝트 1', description: '이 프로젝트는 사용자 관리 시스템으로, React와 Spring Boot를 사용하여 개발되었습니다. 사용자 등록, 로그인, 정보 수정 등의 기능을 포함합니다.', githubLink: 'https://github.com/your-repo/project1', demoLink: 'https://demo.project1.com' },
   { id: 2, imageSrc: '/Mask group-1.svg', title: '프로젝트 2', description: '온라인 쇼핑몰 백엔드 시스템입니다. Java와 Spring Framework를 기반으로 주문 처리, 재고 관리, 결제 연동 등을 구현했습니다.', githubLink: 'https://github.com/your-repo/project2', demoLink: 'https://demo.project2.com' },
   { id: 3, imageSrc: '/Mask group1.svg', title: '프로젝트 3', description: 'AI 기반 이미지 분류 서비스. Python과 TensorFlow를 사용하여 이미지 데이터를 학습하고 분류하는 RESTful API를 제공합니다.', githubLink: 'https://github.com/your-repo/project3', demoLink: 'https://demo.project3.com' },
-  // Add more projects as needed. Make sure to update the image paths if they are different.
 ];
-
 
 export default function Home() {
   const introRef = useRef(null);
@@ -101,18 +97,20 @@ export default function Home() {
   const [introActive, setIntroActive] = useState(false);
   const [mainActive, setMainActive] = useState(false);
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, idx: 0 });
-  // tech stack 툴팁 상태
   const [stackTooltip, setStackTooltip] = useState({ show: false, idx: 0, x: 0, y: 0, direction: 'up' });
 
-  // Project section states
-  const [selectedProject, setSelectedProject] = useState(null); // State for the expanded project
+  // 프로젝트 관련 상태들
+  const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [isProjectExpanded, setIsProjectExpanded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
-  const projectScrollRef = useRef(null); // Ref to the project cards scrollable div
-  const dragThreshold = 5; // Minimum pixels moved to be considered a drag, not a click
+  const [dragDistance, setDragDistance] = useState(0);
+  const projectScrollRef = useRef<HTMLDivElement | null>(null);
+  const dragThreshold = 5;
+  const closeThreshold = 150; // 오른쪽으로 이만큼 넘기면 자동 접힘
 
-  // 각 물음표별로 랜덤하게 Q/A 배정 (컴포넌트 마운트 시)
+  // 각 물음표별로 랜덤하게 Q/A 배정
   const [questionOrder] = useState(() => {
     const arr = [0, 1, 2, 3];
     for (let i = arr.length - 1; i > 0; i--) {
@@ -122,21 +120,19 @@ export default function Home() {
     return arr;
   });
 
-  // 툴팁 위치 조정 함수 (idx: 물음표 인덱스)
+  // 툴팁 관련 함수들
   const handleMouseEnter = (e) => {
     const rect = (e.target).getBoundingClientRect();
     setTooltip({ show: true, x: rect.left + rect.width / 2, y: rect.top, idx: parseInt(e.currentTarget.dataset.idx) });
   };
   const handleMouseLeave = () => setTooltip({ show: false, x: 0, y: 0, idx: 0 });
 
-  // tech stack 마우스 오버 핸들러
   const handleStackMouseEnter = (idx) => {
     const ref = stackRefs[idx].current;
     if (ref) {
       const rect = ref.getBoundingClientRect();
-      // Adjust direction based on position to keep tooltip on screen
       let direction = 'up';
-      if (rect.top < 120) { // If too close to top, show down
+      if (rect.top < 120) {
         direction = 'down';
       }
       setStackTooltip({
@@ -150,28 +146,35 @@ export default function Home() {
   };
   const handleStackMouseLeave = () => setStackTooltip({ show: false, idx: 0, x: 0, y: 0, direction: 'up' });
 
-  // Project Card Drag Scrolling Handlers
-  const handleProjectMouseDown = (e) => {
-    setIsDragging(true);
-    setStartX(e.pageX - projectScrollRef.current.offsetLeft);
-    setScrollLeft(projectScrollRef.current.scrollLeft);
+  // 프로젝트 카드 클릭 핸들러 (상세 모달 열기)
+  const handleProjectCardClick = (project: any) => {
+    if (!isDragging && dragDistance < dragThreshold) {
+      setSelectedProject(project);
+    }
   };
 
-  const handleProjectMouseMove = (e) => {
-    if (!isDragging) return;
-    e.preventDefault(); // Prevent text selection and other native drag behaviors
+  // 드래그 관련 함수들
+  const handleProjectMouseDown = (e: any) => {
+    if (!isProjectExpanded) return;
+    setIsDragging(true);
+    if (projectScrollRef.current) {
+      setStartX(e.pageX - projectScrollRef.current.offsetLeft);
+      setScrollLeft(projectScrollRef.current.scrollLeft);
+    }
+    setDragDistance(0);
+  };
+
+  const handleProjectMouseMove = (e: any) => {
+    if (!isDragging || !isProjectExpanded || !projectScrollRef.current) return;
+    e.preventDefault();
     const x = e.pageX - projectScrollRef.current.offsetLeft;
-    const walk = (x - startX) * 1.5; // Scroll-fastness multiplier
+    const walk = (x - startX) * 1.5;
+    const distance = Math.abs(x - startX);
+    setDragDistance(distance);
     projectScrollRef.current.scrollLeft = scrollLeft - walk;
   };
 
-  const handleProjectMouseUp = (e) => {
-    // Only set dragging to false if it was an actual drag, not a click
-    const x = e.pageX - projectScrollRef.current.offsetLeft;
-    if (Math.abs(x - startX) < dragThreshold) {
-      // This means it was more of a click than a drag
-      // You can add logic here if you want to differentiate clicks vs drags for card expansion
-    }
+  const handleProjectMouseUp = () => {
     setIsDragging(false);
   };
 
@@ -179,25 +182,17 @@ export default function Home() {
     setIsDragging(false);
   };
 
-  // Handle card click to open the modal/expanded view
-  const handleCardClick = (project) => {
-    // Only open the modal if it wasn't a drag action
-    // This check is a simple heuristic; for more robustness, you might need
-    // to track mouse movement more precisely during click.
-    if (!isDragging) { // This `isDragging` check here needs to be careful.
-                       // `handleProjectMouseUp` already sets `isDragging` to false.
-                       // A better check would be to see if `e.movementX` or `e.movementY` was large.
-                       // For simplicity here, let's just proceed with opening.
-        setSelectedProject(project);
+  // 배경 클릭 시 카드 접기
+  const handleProjectBackgroundClick = (e: any) => {
+    if (e.target === e.currentTarget && isProjectExpanded) {
+      setIsProjectExpanded(false);
     }
   };
 
-
-  // Handle closing the modal
+  // 모달 닫기
   const handleCloseModal = () => {
     setSelectedProject(null);
   };
-
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
@@ -241,17 +236,18 @@ export default function Home() {
           <span className="text-white animate-bounce text-2xl">↓↓</span>
         </div>
       </section>
+
       {/* 두 번째 섹션: 백엔드 개발자 김민서 + 물음표 */}
       <section
         ref={mainRef}
         className={`snap-start h-screen w-full flex items-center justify-center bg-[#22304a] relative section-inactive ${mainActive ? "section-animate" : ""}`}
       >
-        {/* 네 귀퉁이 물음표 (각각 랜덤 Q/A) */}
+        {/* 네 귀퉁이 물음표 */}
         <span
           className="absolute left-69 top-50 text-white text-6xl cursor-pointer select-none"
           onMouseEnter={e => handleMouseEnter(e, questionOrder[0])}
           onMouseLeave={handleMouseLeave}
-          data-idx={questionOrder[0]} // Pass index via data attribute
+          data-idx={questionOrder[0]}
           style={{ fontFamily: 'iceSimin-Rg' }}
         >
           ?
@@ -260,7 +256,7 @@ export default function Home() {
           className="absolute right-50 top-70 text-white text-6xl cursor-pointer select-none"
           onMouseEnter={e => handleMouseEnter(e, questionOrder[1])}
           onMouseLeave={handleMouseLeave}
-          data-idx={questionOrder[1]} // Pass index via data attribute
+          data-idx={questionOrder[1]}
           style={{ fontFamily: 'iceSimin-Rg' }}
         >
           ?
@@ -269,7 +265,7 @@ export default function Home() {
           className="absolute left-56 bottom-56 text-white text-6xl cursor-pointer select-none"
           onMouseEnter={e => handleMouseEnter(e, questionOrder[2])}
           onMouseLeave={handleMouseLeave}
-          data-idx={questionOrder[2]} // Pass index via data attribute
+          data-idx={questionOrder[2]}
           style={{ fontFamily: 'iceSimin-Rg' }}
         >
           ?
@@ -278,7 +274,7 @@ export default function Home() {
           className="absolute right-76 bottom-56 text-white text-6xl cursor-pointer select-none"
           onMouseEnter={e => handleMouseEnter(e, questionOrder[3])}
           onMouseLeave={handleMouseLeave}
-          data-idx={questionOrder[3]} // Pass index via data attribute
+          data-idx={questionOrder[3]}
           style={{ fontFamily: 'iceSimin-Rg' }}
         >
           ?
@@ -297,13 +293,12 @@ export default function Home() {
           </div>
         )}
       </section>
+
       {/* 세 번째 섹션: Tech Stack */}
       <section className="snap-start h-screen w-full flex flex-col items-center justify-center bg-[#f5f6fa] relative">
         <div className="absolute inset-0 flex items-center justify-center">
-          {/* 원형 배치 */}
           <div className="relative w-[700px] h-[500px] mx-auto">
             {techStacks.map((stack, i) => {
-              // 원형 좌표 계산
               const angle = (2 * Math.PI * i) / techStacks.length;
               const radius = 200;
               const cx = 350 + radius * Math.cos(angle);
@@ -325,13 +320,12 @@ export default function Home() {
                 </div>
               );
             })}
-            {/* 중앙 텍스트 */}
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-5xl font-bold" style={{ fontFamily: 'Pacifico, cursive' , color: '#000000' }}>
               Tech Stack
             </div>
           </div>
         </div>
-        {/* 툴팁: fixed로, 항상 맨 위에 */}
+        {/* 툴팁 */}
         {stackTooltip.show && techStacks[stackTooltip.idx].desc && (
           <div
             className="fixed z-[9999] pointer-events-auto bg-[#f4faff] text-[#22304a] text-lg rounded-2xl shadow-2xl p-8 border border-blue-200 max-w-md font-semibold"
@@ -346,7 +340,7 @@ export default function Home() {
             }}
           >
             <div style={{ fontFamily: 'Pacifico, cursive', fontSize: '2rem', marginBottom: '0.5rem' }}>
-              {techStacks[stackTooltip.idx].name} {/* Display name first, then description */}
+              {techStacks[stackTooltip.idx].name}
             </div>
             <div className="text-base font-normal whitespace-pre-line">
               {techStacks[stackTooltip.idx].desc}
@@ -354,59 +348,97 @@ export default function Home() {
           </div>
         )}
       </section>
+
       {/* 프로젝트 섹션 */}
       <section>
-        <div className="snap-start h-screen w-full flex flex-col items-center justify-center bg-[#FFF7ED] relative">
-          <div className="w-full max-w-[1700px] px-8 relative">
+        <div 
+          className="snap-start h-screen w-full flex flex-col items-center justify-center bg-[#FFF7ED] relative overflow-hidden"
+          onClick={handleProjectBackgroundClick}
+        >
+          <div className="w-full h-full relative">
             {/* Project 글씨 (배경) */}
-            <div className="absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-1/2 text-5x1 font-bold pointer-events-none"
+            <div 
+              className={`absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-1/2 text-5xl font-bold pointer-events-none transition-opacity duration-500 ${isProjectExpanded ? 'opacity-20' : 'opacity-100'}`}
               style={{ fontFamily: 'Pacifico, cursive', color: '#000000', whiteSpace: 'nowrap' }}
             >
               Project
             </div>
-            {/* 카드 리스트 */}
-            <div
-              ref={projectScrollRef} // Attach ref for project scrolling
-              className="flex overflow-x-auto space-x-8 py-8 relative z-10 scrollbar-hide cursor-grab active:cursor-grabbing"
-              style={{ scrollSnapType: 'x mandatory' }}
-              onWheel={e => {
-                const target = e.currentTarget;
-                if (e.deltaY !== 0) {
-                  e.preventDefault();
-                  target.scrollLeft += e.deltaY;
-                }
-              }}
-              onMouseDown={handleProjectMouseDown}
-              onMouseMove={handleProjectMouseMove}
-              onMouseUp={handleProjectMouseUp}
-              onMouseLeave={handleProjectMouseLeave} // To stop dragging if mouse leaves
-            >
-              {projects.map((project) => (
-                <div
-                  key={project.id}
-                  className="flex-shrink-0 w-[500px] h-[300px] bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col items-center justify-center cursor-pointer transform transition-transform duration-300 hover:scale-105"
-                  onClick={() => handleCardClick(project)} // Attach click handler
-                  draggable="false" // Prevent native image dragging
-                  style={{ scrollSnapAlign: 'center' }} // Optional: helps with snap behavior
-                >
-                  <img src={project.imageSrc} alt={project.title} className="w-full h-full object-cover" draggable="false" />
-                </div>
-              ))}
+            
+            {/* 카드 컨테이너 - 오른쪽에서 슬라이드 */}
+            <div className="absolute right-0 top-0 w-full h-full flex items-center">
+              <div
+                ref={projectScrollRef}
+                className={`flex space-x-8 py-8 scrollbar-hide transition-transform duration-700 ease-out ${isProjectExpanded ? 'transform translate-x-0' : 'transform translate-x-[calc(100%-400px)]'}`}
+                style={{ scrollSnapType: 'x mandatory', cursor: isProjectExpanded ? 'grab' : 'pointer' }}
+                onWheel={e => {
+                  if (!isProjectExpanded) return;
+                  const target = e.currentTarget as HTMLDivElement;
+                  if (e.deltaY !== 0) {
+                    e.preventDefault();
+                    target.scrollLeft += e.deltaY;
+                  }
+                }}
+                onMouseDown={handleProjectMouseDown}
+                onMouseMove={handleProjectMouseMove}
+                onMouseUp={handleProjectMouseUp}
+                onMouseLeave={handleProjectMouseLeave}
+                onClick={(e: any) => {
+                  if (!isProjectExpanded) {
+                    e.stopPropagation();
+                    setIsProjectExpanded(true);
+                  }
+                }}
+              >
+                {projects.map((project: any) => (
+                  <div
+                    key={project.id}
+                    className="flex-shrink-0 w-[500px] h-[300px] bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transform transition-transform duration-300 hover:scale-105"
+                    onClick={(e: any) => {
+                      if (isProjectExpanded) {
+                        e.stopPropagation();
+                        handleProjectCardClick(project);
+                      }
+                    }}
+                    draggable="false"
+                    style={{ scrollSnapAlign: 'center' }}
+                  >
+                    <img 
+                      src={project.imageSrc} 
+                      alt={project.title} 
+                      className="w-full h-full object-cover" 
+                      draggable="false" 
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
+            
+            {/* 힌트 텍스트 */}
+            {!isProjectExpanded && (
+              <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-gray-600 text-sm">
+                카드를 클릭하여 프로젝트를 확인해보세요
+              </div>
+            )}
+            
+            {isProjectExpanded && (
+              <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-gray-600 text-sm">
+                배경을 클릭하거나 오른쪽으로 드래그하면 닫힙니다
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Expanded Project Modal */}
+      {/* 프로젝트 상세 모달 */}
       {selectedProject && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={handleCloseModal}>
           <div className="bg-white rounded-lg p-6 max-w-4xl w-full flex flex-col md:flex-row gap-6 relative" onClick={(e) => e.stopPropagation()}>
-            {/* Image */}
+            {/* 이미지 */}
             <div className="w-full md:w-1/2 flex items-center justify-center">
               <img src={selectedProject.imageSrc} alt={selectedProject.title} className="max-h-[70vh] object-contain rounded-lg shadow-md" />
             </div>
 
-            {/* Details */}
+            {/* 상세 정보 */}
             <div className="w-full md:w-1/2 flex flex-col justify-center">
               <h2 className="text-4xl font-bold mb-4 text-gray-900">{selectedProject.title}</h2>
               <p className="text-gray-700 text-lg leading-relaxed mb-4">{selectedProject.description}</p>
@@ -424,7 +456,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Close Button */}
+            {/* 닫기 버튼 */}
             <button
               onClick={handleCloseModal}
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold"
